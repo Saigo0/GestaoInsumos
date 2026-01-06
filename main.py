@@ -129,6 +129,13 @@ class App(ctk.CTk):
         self.menu_ano.set(ano_atual)      # <--- Define o ano atual
         self.menu_ano.pack(side="left", padx=5, pady=5)
 
+        # Menu de Produtos no Relatório
+        self.menu_filtro_produto = ctk.CTkOptionMenu(self.frame_filtros, values=["Todos"])
+        self.menu_filtro_produto.pack(side="left", padx=5, pady=5)
+
+        # Atualizar a lista de produtos no menu do relatório
+        self.atualizar_menu_produtos_relatorio()
+
         self.btn_filtrar = ctk.CTkButton(self.frame_filtros, text="Filtrar", command=self.gerar_relatorio)
         self.btn_filtrar.pack(side="left", padx=5, pady=5)
 
@@ -208,42 +215,37 @@ class App(ctk.CTk):
         except ValueError:
             print("Erro: Insira valores numéricos válidos!")    
 
+    def atualizar_menu_produtos_relatorio(self):
+        dados = self.db.buscar_produtos()
+        # Criamos uma lista começando com "Todos"
+        nomes = ["Todos"] + [nome for id_prod, nome in dados]
+        self.menu_filtro_produto.configure(values=nomes)
+        self.menu_filtro_produto.set("Todos")
+
     def gerar_relatorio(self):
-        # Limpar tabela atual
         for i in self.tabela.get_children():
             self.tabela.delete(i)
 
-        
-
-        # Obter valores dos filtros
-        mes_nome = self.menu_mes.get()
-        mes_num = self.meses_map[mes_nome]
+        mes_num = self.meses_map[self.menu_mes.get()]
         ano = self.menu_ano.get()
-
-        # Buscar no banco
-        compras_do_mes = self.db.filtrar_compras_por_periodo(mes_num, ano)
         
-        gasto_total_mes = 0
+        # Lógica do Filtro de Produto
+        produto_nome = self.menu_filtro_produto.get()
+        # Se for "Todos", passamos None. Se for um produto, pegamos o ID no nosso dicionário
+        produto_id = self.produtos_map.get(produto_nome) if produto_nome != "Todos" else None
 
+        # Chamada ao banco com o novo parâmetro
+        compras_do_mes = self.db.filtrar_compras_periodo_e_produto(mes_num, ano, produto_id)
+        
+        total_geral = 0
         for r in compras_do_mes:
             # r[0]=id, r[1]=nome, r[2]=preco, r[3]=qtd, r[4]=data
-            preco = r[2]
-            qtd = r[3]
-            total_item = preco * qtd
-            gasto_total_mes += total_item
+            total_item = r[2] * r[3]
+            total_geral += total_item
             
-            # Inserir na tabela
-            self.tabela.insert("", "end", values=(
-                r[0],
-                r[1], 
-                f"R$ {preco:.2f}", 
-                qtd, 
-                f"R$ {total_item:.2f}", 
-                r[4]
-            ))
+            self.tabela.insert("", "end", values=(r[0], r[1], f"R$ {r[2]:.2f}", r[3], f"R$ {total_item:.2f}", r[4]))
 
-        # Atualizar o Label de Total
-        self.lbl_total_geral.configure(text=f"Gasto Total no Mês: R$ {gasto_total_mes:.2f}")
+        self.lbl_total_geral.configure(text=f"Total: R$ {total_geral:.2f}")
         
     def acao_cadastrar_produto(self):
         nome = self.entry_nome_prod.get().strip()

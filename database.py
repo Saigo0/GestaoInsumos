@@ -42,21 +42,27 @@ class Database:
                           VALUES (?, ?, ?, ?)''', (produto_id, preco, qtd, data))
         self.conn.commit()
 
-    def filtrar_compras_por_periodo(self, mes, ano):
-        """Busca compras de um mês e ano específicos"""
+    def filtrar_compras_periodo_e_produto(self, mes, ano, produto_id=None):
         cursor = self.conn.cursor()
+        filtro_data = f"%/{mes}/{ano}%"
         
-        # O filtro busca algo como '%/01/2026%' na string da data
-        filtro = f"%/{mes}/{ano}%"
-        
+        # Base da query
         query = """
             SELECT c.id, p.nome, c.preco_unitario, c.quantidade, c.data 
             FROM compras c
             JOIN produtos p ON c.produto_id = p.id
             WHERE c.data LIKE ?
-            ORDER BY c.data DESC
         """
-        cursor.execute(query, (filtro,))
+        params = [filtro_data]
+
+        # Se um produto específico foi selecionado, adicionamos o filtro
+        if produto_id:
+            query += " AND c.produto_id = ?"
+            params.append(produto_id)
+        
+        query += " ORDER BY c.data DESC"
+        
+        cursor.execute(query, params)
         return cursor.fetchall()    
     
     def excluir_compra(self, compra_id):
