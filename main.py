@@ -33,13 +33,15 @@ class App(ctk.CTk):
             "Setembro": "09", "Outubro": "10", "Novembro": "11", "Dezembro": "12"
         }
         
+        # 1. Primeiro cria todas as telas
         self.configurar_tela_relatorio()
-
         self.configurar_tela_produto()
         self.configurar_tela_compra()
         
-        # Carregar produtos pela primeira vez
-        self.atualizar_menu_produtos()
+        # 2. Depois carrega os dados iniciais em todas elas
+        self.atualizar_menu_produtos()           # Popula aba de compra
+        self.atualizar_menu_produtos_relatorio() # Popula aba de relatório
+        self.atualizar_filtros_fornecedor()      # Popula fornecedores
 
 
 
@@ -100,44 +102,70 @@ class App(ctk.CTk):
         self.entry_qtd = ctk.CTkEntry(self.tab_compra, placeholder_text="Ex: 10", width=300)
         self.entry_qtd.pack(pady=(0, 15), padx=20)
 
+        self.lbl_fornecedor = ctk.CTkLabel(self.tab_compra, text="Fornecedor:", font=("Arial", 12, "bold"))
+        self.lbl_fornecedor.pack(padx=20)
+
+        self.entry_fornecedor = ctk.CTkEntry(self.tab_compra, placeholder_text="Ex: Atacadão S.A.", width=300)
+        self.entry_fornecedor.pack(pady=(0, 15), padx=20)
+
         # Botão
         self.btn_salvar = ctk.CTkButton(self.tab_compra, text="Salvar Compra", command=self.acao_registrar_compra)
         self.btn_salvar.pack(pady=20)
 
+    def atualizar_menu_fornecedores(self):
+        lista = ["Todos"] + self.db.buscar_fornecedores_unicos()
+        self.menu_filtro_fornecedor.configure(values=lista)
+
     def configurar_tela_relatorio(self):
 
         agora = datetime.now()
-        mes_atual_numero = agora.strftime("%m") # Ex: "01", "05"
-        ano_atual = agora.strftime("%Y")        # Ex: "2026"
-
-        # 2. Descobrir o nome do mês a partir do número (usando seu meses_map)
-        # Procuramos qual chave (Nome) corresponde ao valor (Número)
+        mes_atual_numero = agora.strftime("%m")
+        ano_atual = agora.strftime("%Y")
         mes_atual_nome = [nome for nome, num in self.meses_map.items() if num == mes_atual_numero][0]
 
-        # Frame para os filtros (fica no topo da aba)
+        # Frame Principal dos Filtros
         self.frame_filtros = ctk.CTkFrame(self.tab_relatorio)
         self.frame_filtros.pack(pady=10, padx=10, fill="x")
 
-        # 3. Configurar os menus com os valores atuais como padrão
-        self.menu_mes = ctk.CTkOptionMenu(self.frame_filtros, values=list(self.meses_map.keys()))
-        self.menu_mes.set(mes_atual_nome) # <--- Define o mês atual
-        self.menu_mes.pack(side="left", padx=5, pady=5)
+        # --- FILTRO MÊS ---
+        self.container_mes = ctk.CTkFrame(self.frame_filtros, fg_color="transparent")
+        self.container_mes.pack(side="left", padx=10, pady=5)
+        
+        ctk.CTkLabel(self.container_mes, text="Mês:", font=("Arial", 11, "bold")).pack()
+        self.menu_mes = ctk.CTkOptionMenu(self.container_mes, values=list(self.meses_map.keys()), width=120)
+        self.menu_mes.set(mes_atual_nome)
+        self.menu_mes.pack()
 
+        # --- FILTRO ANO ---
+        self.container_ano = ctk.CTkFrame(self.frame_filtros, fg_color="transparent")
+        self.container_ano.pack(side="left", padx=10, pady=5)
+        
+        ctk.CTkLabel(self.container_ano, text="Ano:", font=("Arial", 11, "bold")).pack()
         ano_int = int(datetime.now().year)
         lista_anos = [str(ano_int - 1), str(ano_int), str(ano_int + 1), str(ano_int + 2)]
-        self.menu_ano = ctk.CTkOptionMenu(self.frame_filtros, values=lista_anos)
-        self.menu_ano.set(ano_atual)      # <--- Define o ano atual
-        self.menu_ano.pack(side="left", padx=5, pady=5)
+        self.menu_ano = ctk.CTkOptionMenu(self.container_ano, values=lista_anos, width=80)
+        self.menu_ano.set(ano_atual)
+        self.menu_ano.pack()
 
-        # Menu de Produtos no Relatório
-        self.menu_filtro_produto = ctk.CTkOptionMenu(self.frame_filtros, values=["Todos"])
-        self.menu_filtro_produto.pack(side="left", padx=5, pady=5)
+        # --- FILTRO PRODUTO ---
+        self.container_prod = ctk.CTkFrame(self.frame_filtros, fg_color="transparent")
+        self.container_prod.pack(side="left", padx=10, pady=5)
+        
+        ctk.CTkLabel(self.container_prod, text="Produto:", font=("Arial", 11, "bold")).pack()
+        self.menu_filtro_produto = ctk.CTkOptionMenu(self.container_prod, values=["Todos"], width=150)
+        self.menu_filtro_produto.pack()
 
-        # Atualizar a lista de produtos no menu do relatório
-        self.atualizar_menu_produtos_relatorio()
+        # --- FILTRO FORNECEDOR ---
+        self.container_forn = ctk.CTkFrame(self.frame_filtros, fg_color="transparent")
+        self.container_forn.pack(side="left", padx=10, pady=5)
+        
+        ctk.CTkLabel(self.container_forn, text="Fornecedor:", font=("Arial", 11, "bold")).pack()
+        self.menu_filtro_fornecedor = ctk.CTkOptionMenu(self.container_forn, values=["Todos"], width=150)
+        self.menu_filtro_fornecedor.pack()
 
-        self.btn_filtrar = ctk.CTkButton(self.frame_filtros, text="Filtrar", command=self.gerar_relatorio)
-        self.btn_filtrar.pack(side="left", padx=5, pady=5)
+        # Botão Filtrar (centralizado verticalmente em relação aos outros)
+        self.btn_filtrar = ctk.CTkButton(self.frame_filtros, text="🔍 Filtrar", command=self.gerar_relatorio, width=100)
+        self.btn_filtrar.pack(side="left", padx=20, pady=(20, 0)) # pady maior em cima para alinhar com os menus
 
         # Configuração da Tabela (Treeview)
         # Nota: O Treeview é do Tkinter padrão, então a estilização é um pouco diferente
@@ -146,36 +174,97 @@ class App(ctk.CTk):
         style.configure("Treeview", background="#2b2b2b", foreground="white", fieldbackground="#2b2b2b", borderwidth=0)
         style.map("Treeview", background=[('selected', '#1f538d')])
 
+        # 1. ATUALIZAÇÃO: Adicione "fornecedor" na lista de colunas
         self.tabela = ttk.Treeview(self.tab_relatorio, 
-                           columns=("id", "prod", "preco", "qtd", "total", "data"), 
+                           columns=("id", "prod", "preco", "qtd", "total", "data", "fornecedor"), 
                            show="headings")
 
-        # 2. Configure os cabeçalhos (Headings)
-        self.tabela.heading("id", text="ID") # Esse texto não aparecerá se a largura for 0
+        # 2. Configure os cabeçalhos (incluindo o fornecedor)
+        self.tabela.heading("id", text="ID")
         self.tabela.heading("prod", text="Produto")
         self.tabela.heading("preco", text="Preço Unit.")
         self.tabela.heading("qtd", text="Qtd")
         self.tabela.heading("total", text="Total")
         self.tabela.heading("data", text="Data")
+        self.tabela.heading("fornecedor", text="Fornecedor") # <-- Adicionado
 
-        # 3. O PULO DO GATO: Esconder a coluna do ID
-        # Definimos a largura como 0 e proibimos o redimensionamento (stretch=False)
+        # 3. Ajuste de larguras
         self.tabela.column("id", width=0, stretch=ctk.NO)
         self.tabela.column("qtd", width=50)
         self.tabela.column("total", width=100)
+        self.tabela.column("fornecedor", width=150) # <-- Adicionado
         
         self.tabela.pack(pady=10, padx=10, fill="both", expand=True)
 
-        # Label para o Gasto Total
         self.lbl_total_geral = ctk.CTkLabel(self.tab_relatorio, text="Gasto Total: R$ 0,00", font=("Arial", 18, "bold"))
-        self.lbl_total_geral.pack(pady=10) 
+        self.lbl_total_geral.pack(pady=5) 
 
-        self.btn_excluir = ctk.CTkButton(self.tab_relatorio, text="Excluir Compra Selecionada", 
-                                     command=self.acao_excluir_compra,
-                                     fg_color="#8B0000")
-        self.btn_excluir.pack(pady=10)  
+        # --- FRAME PARA BOTÕES DE AÇÃO ---
+        # Criar um frame para os botões ficarem lado a lado
+        self.frame_botoes_acao = ctk.CTkFrame(self.tab_relatorio, fg_color="transparent")
+        self.frame_botoes_acao.pack(pady=10)
+
+        # AGORA SIM: Criando o botão de EDITAR
+        self.btn_editar = ctk.CTkButton(self.frame_botoes_acao, text="Editar Selecionado", 
+                                        command=self.acao_editar_compra,
+                                        fg_color="orange", hover_color="#CC7722", text_color="black")
+        self.btn_editar.pack(side="left", padx=10)
+
+        self.btn_excluir = ctk.CTkButton(self.frame_botoes_acao, text="Excluir Selecionada", 
+                                         command=self.acao_excluir_compra,
+                                         fg_color="#8B0000")
+        self.btn_excluir.pack(side="left", padx=10)
 
         self.gerar_relatorio() 
+    
+    def acao_editar_compra(self):
+        selecionado = self.tabela.selection()
+        if not selecionado:
+            messagebox.showwarning("Aviso", "Selecione uma compra para editar.")
+            return
+
+        valores = self.tabela.item(selecionado, "values")
+        # Desempacotando agora com o fornecedor incluído (são 7 valores)
+        id_c, prod_nome, preco, qtd, total, data, forn_atual = valores 
+
+        janela_edit = ctk.CTkToplevel(self)
+        janela_edit.title(f"Editando: {prod_nome}")
+        janela_edit.geometry("400x450")
+        janela_edit.grab_set()
+        janela_edit.attributes("-topmost", True) # Garante que a janela fique na frente
+
+        ctk.CTkLabel(janela_edit, text=f"Editando {prod_nome}", font=("Arial", 16, "bold")).pack(pady=10)
+        
+        ctk.CTkLabel(janela_edit, text="Preço Unitário:").pack()
+        ent_preco = ctk.CTkEntry(janela_edit)
+        ent_preco.insert(0, preco.replace("R$ ", "")) 
+        ent_preco.pack(pady=5)
+
+        ctk.CTkLabel(janela_edit, text="Quantidade:").pack()
+        ent_qtd = ctk.CTkEntry(janela_edit)
+        ent_qtd.insert(0, qtd)
+        ent_qtd.pack(pady=5)
+
+        ctk.CTkLabel(janela_edit, text="Fornecedor:").pack()
+        ent_forn = ctk.CTkEntry(janela_edit)
+        ent_forn.insert(0, forn_atual if forn_atual != "Não inf." else "")
+        ent_forn.pack(pady=5)
+
+        def salvar_alteracoes():
+            try:
+                novo_p = float(ent_preco.get().replace(',', '.'))
+                nova_q = float(ent_qtd.get().replace(',', '.'))
+                novo_f = ent_forn.get().strip()
+
+                self.db.editar_compra(id_c, novo_p, nova_q, novo_f)
+                janela_edit.destroy()
+                self.gerar_relatorio()
+                self.atualizar_filtros_fornecedor() # Atualiza o filtro se o nome mudar
+                messagebox.showinfo("Sucesso", "Registro atualizado!")
+            except ValueError:
+                messagebox.showerror("Erro", "Valores de preço ou quantidade inválidos.")
+
+        ctk.CTkButton(janela_edit, text="Salvar Alterações", command=salvar_alteracoes, fg_color="green").pack(pady=20)
 
     def atualizar_menu_produtos(self):
         """Busca produtos no banco e atualiza o OptionMenu"""
@@ -217,36 +306,62 @@ class App(ctk.CTk):
 
     def atualizar_menu_produtos_relatorio(self):
         dados = self.db.buscar_produtos()
-        # Criamos uma lista começando com "Todos"
+        print(f"DEBUG Relatório: Produtos encontrados no banco: {dados}") # Veja se aparece algo no terminal
+        
         nomes = ["Todos"] + [nome for id_prod, nome in dados]
         self.menu_filtro_produto.configure(values=nomes)
-        self.menu_filtro_produto.set("Todos")
+        
+        # Se o que estava selecionado sumiu, volta para "Todos"
+        if self.menu_filtro_produto.get() not in nomes:
+            self.menu_filtro_produto.set("Todos")
 
     def gerar_relatorio(self):
+        # 1. Limpa a tabela
         for i in self.tabela.get_children():
             self.tabela.delete(i)
 
-        mes_num = self.meses_map[self.menu_mes.get()]
+        # 2. Captura os valores dos filtros da tela
+        mes_nome = self.menu_mes.get()
+        mes_num = self.meses_map[mes_nome]
         ano = self.menu_ano.get()
         
-        # Lógica do Filtro de Produto
-        produto_nome = self.menu_filtro_produto.get()
-        # Se for "Todos", passamos None. Se for um produto, pegamos o ID no nosso dicionário
-        produto_id = self.produtos_map.get(produto_nome) if produto_nome != "Todos" else None
-
-        # Chamada ao banco com o novo parâmetro
-        compras_do_mes = self.db.filtrar_compras_periodo_e_produto(mes_num, ano, produto_id)
+        # Filtro de Produto
+        prod_nome = self.menu_filtro_produto.get()
+        id_produto = self.produtos_map.get(prod_nome) if prod_nome != "Todos" else None
         
-        total_geral = 0
-        for r in compras_do_mes:
-            # r[0]=id, r[1]=nome, r[2]=preco, r[3]=qtd, r[4]=data
-            total_item = r[2] * r[3]
-            total_geral += total_item
+        # Filtro de Fornecedor
+        fornecedor_selecionado = self.menu_filtro_fornecedor.get()
+
+        # 3. Busca no banco com todos os filtros
+        dados = self.db.filtrar_compras_completo(mes_num, ano, id_produto, fornecedor_selecionado)
+
+        total_financeiro = 0
+
+        # 4. Preenche a tabela
+        for r in dados:
+            # r[0]=id, r[1]=nome, r[2]=preco, r[3]=qtd, r[4]=data, r[5]=fornecedor
+            valor_total_item = r[2] * r[3]
+            total_financeiro += valor_total_item
             
-            self.tabela.insert("", "end", values=(r[0], r[1], f"R$ {r[2]:.2f}", r[3], f"R$ {total_item:.2f}", r[4]))
+            # Lembre-se que a coluna ID [0] está oculta, então os dados começam no index 1
+            self.tabela.insert("", "end", values=(
+                r[0], 
+                r[1], 
+                f"R$ {r[2]:.2f}", 
+                r[3], 
+                f"R$ {valor_total_item:.2f}", 
+                r[4],
+                r[5] if r[5] else "Não inf." # Trata se o fornecedor for vazio
+            ))
 
-        self.lbl_total_geral.configure(text=f"Total: R$ {total_geral:.2f}")
-        
+        # 5. Atualiza o label de total no rodapé
+        self.lbl_total_geral.configure(text=f"Total Geral: R$ {total_financeiro:.2f}")
+
+    def atualizar_filtros_fornecedor(self):
+        lista_db = self.db.listar_fornecedores_unicos()
+        opcoes = ["Todos"] + sorted(lista_db)
+        self.menu_filtro_fornecedor.configure(values=opcoes)    
+    
     def acao_cadastrar_produto(self):
         nome = self.entry_nome_prod.get().strip()
         unidade = self.menu_unidade.get()
@@ -256,7 +371,8 @@ class App(ctk.CTk):
                 self.db.salvar_produto(nome, unidade)
                 self.label_aviso_prod.configure(text=f"✅ {nome} cadastrado com sucesso!", text_color="green")
                 self.entry_nome_prod.delete(0, 'end') # Limpa o campo
-                self.atualizar_menu_produtos()
+                self.atualizar_menu_produtos()           # Atualiza aba de Compra
+                self.atualizar_menu_produtos_relatorio()
             except Exception as e:
                 self.label_aviso_prod.configure(text=f"❌ Erro ao salvar: {e}", text_color="red")
         else:

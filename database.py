@@ -7,6 +7,7 @@ class Database:
     def __init__(self, db_name="pastelaria.db"):
         self.conn = sqlite3.connect(db_name)
         self.create_tables()
+        self.atualizar_estrutura()
 
     def create_tables(self):
         cursor = self.conn.cursor()
@@ -23,7 +24,9 @@ class Database:
             preco_unitario REAL NOT NULL,
             quantidade REAL NOT NULL,
             data TEXT NOT NULL,
-            FOREIGN KEY (produto_id) REFERENCES produtos (id))''')
+            fornecedor TEXT, 
+            FOREIGN KEY (produto_id) REFERENCES produtos (id)
+        )''')
         self.conn.commit()
 
     def salvar_produto(self, nome, unidade_medida):
@@ -36,34 +39,73 @@ class Database:
         cursor.execute("SELECT id, nome FROM produtos")
         return cursor.fetchall() # Retorna uma lista de tuplas [(1, 'Carne'), (2, 'Farinha')]
 
-    def salvar_compra(self, produto_id, preco, qtd, data):
+    def salvar_compra(self, produto_id, preco, qtd, data, fornecedor):
         cursor = self.conn.cursor()
-        cursor.execute('''INSERT INTO compras (produto_id, preco_unitario, quantidade, data)
-                          VALUES (?, ?, ?, ?)''', (produto_id, preco, qtd, data))
+        cursor.execute('''INSERT INTO compras (produto_id, preco_unitario, quantidade, data, fornecedor)
+                          VALUES (?, ?, ?, ?, ?)''', (produto_id, preco, qtd, data, fornecedor))
         self.conn.commit()
 
-    def filtrar_compras_periodo_e_produto(self, mes, ano, produto_id=None):
+    def editar_compra(self, compra_id, preco, qtd, fornecedor):
         cursor = self.conn.cursor()
+        cursor.execute("""
+            UPDATE compras 
+            SET preco_unitario = ?, quantidade = ?, fornecedor = ?
+            WHERE id = ?
+        """, (preco, qtd, fornecedor, compra_id))
+        self.conn.commit()
+
+    def buscar_fornecedores_unicos(self):
+        """Busca todos os fornecedores cadastrados para preencher o filtro"""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT DISTINCT fornecedor FROM compras WHERE fornecedor IS NOT NULL")
+        return [row[0] for row in cursor.fetchall()]
+
+    def filtrar_compras_completo(self, mes, ano, produto_id=None, fornecedor=None):
+        cursor = self.conn.cursor()
+        
+        # Filtro base por Mês/Ano
         filtro_data = f"%/{mes}/{ano}%"
         
-        # Base da query
         query = """
-            SELECT c.id, p.nome, c.preco_unitario, c.quantidade, c.data 
+            SELECT c.id, p.nome, c.preco_unitario, c.quantidade, c.data, c.fornecedor 
             FROM compras c
             JOIN produtos p ON c.produto_id = p.id
             WHERE c.data LIKE ?
         """
         params = [filtro_data]
 
-        # Se um produto específico foi selecionado, adicionamos o filtro
+        # Adiciona filtro de Produto se não for "Todos"
         if produto_id:
             query += " AND c.produto_id = ?"
             params.append(produto_id)
-        
+
+        # Adiciona filtro de Fornecedor se não for "Todos"
+        if fornecedor and fornecedor != "Todos":
+            query += " AND c.fornecedor = ?"
+            params.append(fornecedor)
+
         query += " ORDER BY c.data DESC"
         
         cursor.execute(query, params)
         return cursor.fetchall()    
+    
+    def listar_fornecedores_unicos(self):
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT DISTINCT fornecedor FROM compras WHERE fornecedor IS NOT NULL AND fornecedor != ''")
+        retorno = cursor.fetchall()
+        return [f[0] for f in retorno]
+    
+    def atualizar_estrutura(self):
+        cursor = self.conn.cursor()
+        try:
+            # Tentamos adicionar a coluna. 
+            # Se ela já existir, o SQLite vai dar um erro e o 'except' vai segurar.
+            cursor.execute("ALTER TABLE compras ADD COLUMN fornecedor TEXT")
+            self.conn.commit()
+            print("Coluna 'fornecedor' adicionada com sucesso!")
+        except sqlite3.OperationalError:
+            # Se cair aqui, é porque a coluna já existe. Não fazemos nada.
+            print("A coluna 'fornecedor' já existe. Pulando migração.")
     
     def excluir_compra(self, compra_id):
         cursor = self.conn.cursor()
