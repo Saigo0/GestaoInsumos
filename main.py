@@ -293,8 +293,9 @@ class App(ctk.CTk):
             preco = float(self.entry_preco.get().replace(',', '.'))
             qtd = float(self.entry_qtd.get().replace(',', '.'))
             data = datetime.now().strftime("%d/%m/%Y %H:%M")
+            fornecedor = self.entry_fornecedor.get().strip()
 
-            self.db.salvar_compra(produto_id, preco, qtd, data)
+            self.db.salvar_compra(produto_id, preco, qtd, data, fornecedor)
             self.label_aviso_compra.configure(text=f"✅ {nome_selecionado} cadastrado com sucesso!", text_color="green")
             
             # Limpar campos
